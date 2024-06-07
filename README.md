@@ -93,4 +93,5 @@ The model is defined in `learning/phoneme_model.py` and its parameters can be al
    After each epoch, a checkpoint is saved in `learning/model_weights.tar`.
    This script can eaily be run over multiple sessions, since it allows training to resume from the information given in the checkpoint file.
 
-2. To generate text, run `generate.py`
+2. To generate text, run `generate.py`.
+   The output is shown in `results.txt`.
