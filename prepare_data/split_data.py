@@ -14,11 +14,11 @@ from sklearn.model_selection import train_test_split
 def create_datasets(path, seq_length:int):
     # training dataset
     train_store = zarr.DirectoryStore(path / "train_data.zarr")
-    zarr.create(store=train_store, overwrite=True, shape=(0, seq_length+1), chunks=(100000, seq_length+1), dtype=np.int8)
+    zarr.create(store=train_store, overwrite=True, shape=(0, seq_length+1), chunks=(1000000, seq_length+1), dtype=np.int8)
 
     # testing dataset
     test_store = zarr.DirectoryStore(path / "test_data.zarr")
-    zarr.create(store=test_store, overwrite=True, shape=(0, seq_length+1), chunks=(100000, seq_length+1), dtype=np.int8)
+    zarr.create(store=test_store, overwrite=True, shape=(0, seq_length+1), chunks=(1000000, seq_length+1), dtype=np.int8)
 
 
 # equalize sequence lengths of a text
@@ -56,7 +56,10 @@ def remove_duplicates(col:list[list]) -> list[list]:
 def save_array(file_name:str, file_dict:dict, seq_length:int, ratio:float, training, testing):
 
     # identify the file key
-    # WINDOWS EDIT: file_key = re.match(r'.*\\(\d+)', file_name).group(1)
+    # WINDOWS:
+    # file_key = re.match(r'.*\\(\d+)', file_name).group(1)
+
+    # UNIX:
     file_key = re.match(r'.*/(\d+)', file_name).group(1)
     
     # check to see if the file has already been added
