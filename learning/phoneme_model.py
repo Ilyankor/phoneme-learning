@@ -2,7 +2,7 @@ import torch.nn as nn
 
 # model parameters
 lay = 2
-dim = 512
+dim = 256
 drop = 0.2
 num_char = 48
 
@@ -10,7 +10,7 @@ num_char = 48
 class PhonemeModel(nn.Module):
     def __init__(self):
         super().__init__()
-        self.lstm = nn.LSTM(input_size=1, hidden_size=dim, num_layers=2, batch_first=True, dropout=drop)
+        self.lstm = nn.LSTM(input_size=1, hidden_size=dim, num_layers=lay, batch_first=True, dropout=drop)
         self.dropout = nn.Dropout(drop)
         self.linear = nn.Linear(dim, num_char) # hidden dimensions as input, 48 possible outputs
 
