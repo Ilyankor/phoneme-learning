@@ -36,7 +36,7 @@ def equalize(sequences:list[list], seq_length:int) -> list[list]:
 
             # pad the rows that are too short with end of sentence characters
             if row_length < (seq_length+1):
-                row += ["47"] * (seq_length - row_length)
+                row += ["48"] * (seq_length - row_length)
                 row_length = len(row)
             
             # split the row into seq_length+1 rows (input+output)
