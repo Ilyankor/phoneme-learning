@@ -1,4 +1,3 @@
-import os
 import re
 import gzip
 import json
@@ -7,18 +6,13 @@ import itertools
 import numpy as np
 from tqdm import tqdm
 from pathlib import Path
-from sklearn.model_selection import train_test_split
 
 
 # create the datasets
-def create_datasets(path, seq_length:int):
-    # training dataset
-    train_store = zarr.DirectoryStore(path / "train_data.zarr")
-    zarr.create(store=train_store, overwrite=True, shape=(0, seq_length+1), chunks=(1000000, seq_length+1), dtype=np.int8)
-
-    # testing dataset
-    test_store = zarr.DirectoryStore(path / "test_data.zarr")
-    zarr.create(store=test_store, overwrite=True, shape=(0, seq_length+1), chunks=(1000000, seq_length+1), dtype=np.int8)
+def create_datasets(path:Path, data_type:list[str], seq_length:int):
+    for data in data_type:
+        data_store = zarr.DirectoryStore(path / f"{data}.zarr")
+        zarr.create(store=data_store, overwrite=True, shape=(0, seq_length+1), chunks=(1000000, seq_length+1), dtype=np.int8)
 
 
 # equalize sequence lengths of a text
@@ -34,9 +28,9 @@ def equalize(sequences:list[list], seq_length:int) -> list[list]:
             # add an end of sentence character
             row.append("47")
 
-            # pad the rows that are too short with end of sentence characters
+            # pad the rows that are too short with start of sentence characters
             if row_length < (seq_length+1):
-                row += ["48"] * (seq_length - row_length)
+                row += (seq_length - row_length) * ["48"]
                 row_length = len(row)
             
             # split the row into seq_length+1 rows (input+output)
@@ -52,22 +46,46 @@ def remove_duplicates(col:list[list]) -> list[list]:
     return list(col for col, _ in itertools.groupby(col))
 
 
-# operation to carray out for each file
-def save_array(file_name:str, file_dict:dict, seq_length:int, ratio:float, training, testing):
+# split array
+def split_array(sequences:list[list[str]]) -> tuple[list]:
+    # randomize the sequences
+    file_len = len(sequences)
+    indices = rng.choice(opt, size=file_len, p=prob)
 
-    # identify the file key
-    # WINDOWS:
-    # file_key = re.match(r'.*\\(\d+)', file_name).group(1)
+    # create arrays
+    arr_0 = []
+    arr_1 = []
+    arr_2 = []
 
-    # UNIX:
-    file_key = re.match(r'.*/(\d+)', file_name).group(1)
+    # split into arrays
+    for i in range(file_len):
+        if indices[i] == 0:
+            arr_0.append(sequences[i])
+        elif indices[i] == 1:
+            arr_1.append(sequences[i])
+        else:
+            arr_2.append(sequences[i])
     
-    # check to see if the file has already been added
-    try:
-        if file_dict[file_key][2] == 1:
-            return None
-    except IndexError:
-        pass
+    return arr_0, arr_1, arr_2
+
+
+# update dataset
+def save_array(arr:list[list[str]], store:zarr.Array):
+    if arr != []:
+        arr = np.array(arr, dtype=np.int8)
+        store.append(arr, axis=0)
+
+
+# operation to carray out for each file
+def file_op(file_name:str, file_dict:dict, seq_length:int, training, designing, testing):
+
+    # identify the file key 
+    # WINDOWS
+    # file_key = re.match(r'.*\\(\d+)', file_name).group(1)
+    
+    # identify the file key
+    # MAC
+    file_key = re.match(r'.*/(\d+)', file_name).group(1)
 
     # open the text file
     with gzip.open(file_name, "rt", encoding="utf-8") as path_text:
@@ -84,40 +102,13 @@ def save_array(file_name:str, file_dict:dict, seq_length:int, ratio:float, train
     # remove duplicates
     file_text = remove_duplicates(file_text)
 
-    # create train and test arrays
-    # special consideration for number of rows <= 10
-    if len(file_text) <= 10:
-        train = []
-        test = []
-
-        # random choice by row
-        for row in file_text:
-            if rng.choice(opt, p=prob):
-                train.append(row)
-            else:
-                test.append(row)
-
-        # handle empty arrays when updating dataset
-        if train == []:
-            test = np.array(test, dtype=np.int8)
-            testing.append(test, axis=0)
-        elif test == []:
-            train = np.array(train, dtype=np.int8)
-            training.append(train, axis=0)
-        else:
-            train = np.array(train, dtype=np.int8)
-            test = np.array(test, dtype=np.int8)
-            training.append(train, axis=0)
-            testing.append(test, axis=0)
-    else:
-        train, test = train_test_split(np.array(file_text, dtype=np.int8), test_size=ratio)
-
-        # update dataset
-        training.append(train, axis=0)
-        testing.append(test, axis=0)
-
-    # update dictionary
-    file_dict[file_key] = file_dict[file_key] + [1]
+    # save into arrays and update dataset
+    train, design, test = split_array(file_text)
+    
+    # update dataset
+    save_array(train, training)
+    save_array(design, designing)
+    save_array(test, testing)
 
 
 if __name__ == "__main__":
@@ -131,11 +122,12 @@ if __name__ == "__main__":
     if (data_path).is_dir():
         pass
     else:
-        create_datasets(data_path, in_seq_len)
+        create_datasets(data_path, ["train", "design", "test"], in_seq_len)
 
-    # open the dataset
-    train_data = zarr.open_array(data_path / "train_data.zarr", mode="a")
-    test_data = zarr.open_array(data_path / "test_data.zarr", mode="a")
+    # open the datasets
+    train_data = zarr.open_array(data_path / "train.zarr", mode="a")
+    design_data = zarr.open_array(data_path / "design.zarr", mode="a")
+    test_data = zarr.open_array(data_path / "test.zarr", mode="a")
 
     # get converted texts
     path_list = [str(path) for path in Path("clean_texts").rglob("*.gz")]
@@ -144,18 +136,11 @@ if __name__ == "__main__":
     with open("links_list.json", "r") as path_dict:
         file_dict = json.load(path_dict)
 
-    # size of testing data set
-    split_ratio = 0.3
-
-    # rng for special case
+    # rng and split ratio [train, design, test]
     rng = np.random.default_rng()
-    opt = np.array([0,1], dtype=bool)
-    prob = np.array([split_ratio, 1-split_ratio])
+    opt = np.array([0, 1, 2])
+    prob = np.array([0.7, 0.09, 0.21])
     
     # add to the dataset
     for file in tqdm(path_list):
-        save_array(file, file_dict, in_seq_len, split_ratio, train_data, test_data)
-
-    # update file list dictionary
-    with open("links_list.json", "w") as file_list:
-        json.dump(file_dict, file_list)
+        file_op(file, file_dict, in_seq_len, train_data, design_data, test_data)
