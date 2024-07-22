@@ -89,9 +89,8 @@ First, a model was designed and experimented with using the `design.zarr` datase
 
 1. The hidden dimension is set to 256 and batch size to 4096.
    These parameters seemed to work the best for my setup comparing loss and training time per batch.
-   The outcomes of these experiments are placed in `learning/design/lr_const`.
 
-   To run experiments with a model, edit `design.py` and `phoneme_design.py` (the ones inside `lr_const`).
+   To run experiments with a model, edit `design.py` and `phoneme_design.py`.
 
    Since the dataset is large, chunks (as defined by the `zarr` array) are randomly selected and then fed into the `Dataloader` for batch training
    After each epoch, a checkpoint is saved in `model_weights.tar`.
